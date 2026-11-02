@@ -275,8 +275,8 @@ Settings → Secrets → VAULT_ADDR
 ### 1. Clone and create a branch
 
 ```bash
-git clone https://gitea.local/Infra/go-lxd-vm-dashboard-gha.git
-cd go-lxd-vm-dashboard-gha
+git clone https://gitea.local/Infra/grafan-lxd-monitoring-gha.git
+cd grafan-lxd-monitoring-gha
 git checkout -b feature/my-change
 ```
 ### 3. Make changes and go check
@@ -389,8 +389,8 @@ Every HTTP request to `/` triggers this sequence:
 Multi-stage build — Go binary compiled in `golang:1.23-alpine`, copied into `alpine:latest` final image. Only the binary and `index.html` are included. No credentials baked in.
 
 ```bash
-docker build -t 10.206.213.243:32000/go-lxd-vm-dashboard:latest ./app
-docker push 10.206.213.243:32000/go-lxd-vm-dashboard:latest
+docker build -t 10.206.213.243:32000/grafan-lxd-monitoring:latest ./app
+docker push 10.206.213.243:32000/grafan-lxd-monitoring:latest
 ```
 
 **Helm chart:**

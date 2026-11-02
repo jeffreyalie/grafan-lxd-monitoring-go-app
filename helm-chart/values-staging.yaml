@@ -1,9 +1,10 @@
 # helm-chart/values-staging.yaml
 # Overrides for the staging environment
 
-ingress:
-  enabled: true
-  className: "public"
-  host: "staging.local"
 
 existingSecretName: "openbao-creds"
+
+# Inherited from values.yaml - Just for reference, not needed unless you want to override
+# grafana:
+#   dashboard:
+#     enabled: true

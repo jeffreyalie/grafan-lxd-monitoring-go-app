@@ -4,12 +4,13 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o go-lxd-vm-dashboard .
+RUN CGO_ENABLED=0 GOOS=linux go build -o grafan-lxd-monitoring .
 
 # Final Stage
 FROM alpine:latest
-WORKDIR /root/
-COPY --from=builder /app/go-lxd-vm-dashboard .
-COPY --from=builder /app/index.html .
+RUN apk add --no-cache ca-certificates && adduser -D -u 10001 app
+USER app
+WORKDIR /home/app
+COPY --from=builder /app/grafan-lxd-monitoring .
 EXPOSE 8080
-CMD ["./go-lxd-vm-dashboard"]
+CMD ["./grafan-lxd-monitoring"]

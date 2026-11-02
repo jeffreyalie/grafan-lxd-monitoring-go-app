@@ -1,11 +1,6 @@
 # helm-chart/values-live.yaml
 # Overrides for the live environment
 
-ingress:
-  enabled: true
-  className: "public"
-  host: "live.local"
-
 existingSecretName: "openbao-creds"
 
 grafana:

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -15,30 +14,28 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-type InstanceData struct {
-	Instances []api.InstanceFull
-	Error     error
-}
-
 func main() {
-	prometheus.MustRegister(newLXDCollector(30 * time.Second))
+	interval := 30 * time.Second
+	if v := os.Getenv("POLL_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			interval = d
+		}
+	}
+	prometheus.MustRegister(newLXDCollector(interval))
 
-	http.HandleFunc("/", statusHandler)
-	http.Handle("/metrics", promhttp.Handler())
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-
-	fmt.Printf("Server starting on port %s...\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
-}
-
-func statusHandler(w http.ResponseWriter, r *http.Request) {
-	instances, err := fetchInstances()
-	data := InstanceData{Instances: instances, Error: err}
-	renderTemplate(w, data)
+	fmt.Printf("Metrics server starting on port %s...\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
 
 func fetchInstances() ([]api.InstanceFull, error) {
@@ -62,15 +59,6 @@ func fetchInstances() ([]api.InstanceFull, error) {
 	return instances, nil
 }
 
-func renderTemplate(w http.ResponseWriter, data InstanceData) {
-	tmpl, err := template.ParseFiles("index.html")
-	if err != nil {
-		http.Error(w, "Template Load Error", http.StatusInternalServerError)
-		return
-	}
-	_ = tmpl.Execute(w, data)
-}
-
 func getSecrets() (cert, key string, err error) {
 	config := vault.DefaultConfig()
 	config.Address = os.Getenv("VAULT_ADDR")
@@ -84,13 +72,12 @@ func getSecrets() (cert, key string, err error) {
 		return "", "", err
 	}
 
-	loginData := map[string]interface{}{
+	resp, err := client.Logical().Write("auth/approle/login", map[string]interface{}{
 		"role_id":   os.Getenv("VAULT_ROLE_ID"),
 		"secret_id": os.Getenv("VAULT_SECRET_ID"),
-	}
-	resp, err := client.Logical().Write("auth/approle/login", loginData)
-	if err != nil || resp == nil {
-		return "", "", fmt.Errorf("Vault login failed")
+	})
+	if err != nil || resp == nil || resp.Auth == nil {
+		return "", "", fmt.Errorf("vault login failed")
 	}
 	client.SetToken(resp.Auth.ClientToken)
 
@@ -99,6 +86,14 @@ func getSecrets() (cert, key string, err error) {
 		return "", "", fmt.Errorf("failed to read secrets")
 	}
 
-	secretData := secret.Data["data"].(map[string]interface{})
-	return secretData["client_cert"].(string), secretData["client_key"].(string), nil
+	data, ok := secret.Data["data"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("unexpected secret format")
+	}
+	cert, _ = data["client_cert"].(string)
+	key, _ = data["client_key"].(string)
+	if cert == "" || key == "" {
+		return "", "", fmt.Errorf("client_cert/client_key missing in secret")
+	}
+	return cert, key, nil
 }

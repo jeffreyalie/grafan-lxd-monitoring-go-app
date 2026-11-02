@@ -6,7 +6,7 @@ GO = docker run --rm --user $(shell id -u):$(shell id -g) \
   -v "$(CURDIR)/app":/app -w /app golang:1.26.2-alpine
 
 init:
-> $(GO) go mod init go-lxd-vm-dashboard
+> $(GO) go mod init grafan-lxd-monitoring
 
 tidy:
 > $(GO) go mod tidy

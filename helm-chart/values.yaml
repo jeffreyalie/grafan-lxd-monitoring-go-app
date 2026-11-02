@@ -1,23 +1,17 @@
 image:
-  repository: localhost:32000/go-lxd-vm-dashboard
+  repository: localhost:32000/grafan-lxd-monitoring
   tag: "latest"
   pullPolicy: Always
 
 service:
   type: ClusterIP
   port: 80
-  targetPort: 8080 # This MUST match your Go app logs
+  targetPort: 8080
 
 lxd:
   address: "https://10.0.0.250:8443"
 
-# Point Helm to the secret you already created manually
 existingSecretName: "openbao-creds"
-
-ingress:
-  enabled: true
-  className: "public"
-  host: "lxd-dashboard.local"
 
 metrics:
   serviceMonitor:

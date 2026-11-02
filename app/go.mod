@@ -1,4 +1,4 @@
-module go-lxd-vm-dashboard
+module grafan-lxd-monitoring
 
 go 1.26.2
 

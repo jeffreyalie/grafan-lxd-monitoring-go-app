@@ -12,7 +12,7 @@ on:
 
 env:
   # MicroK8s server IP (update in Gitea org secrets when changing)
-  IMAGE_REPO: 10.206.213.243:32000/go-lxd-vm-dashboard
+  IMAGE_REPO: 10.206.213.243:32000/grafan-lxd-monitoring
   IMAGE_TAG: pr-${{ github.run_number }}
 
 jobs:
@@ -93,7 +93,7 @@ jobs:
         run: |
           export KUBECONFIG=/tmp/kubeconfig
 
-          helm upgrade --install go-lxd-vm-dashboard ./helm-chart \
+          helm upgrade --install grafan-lxd-monitoring ./helm-chart \
             --namespace dev \
             --create-namespace \
             --values helm-chart/values-dev.yaml \
@@ -103,7 +103,7 @@ jobs:
       - name: Verify rollout
         run: |
           export KUBECONFIG=/tmp/kubeconfig
-          kubectl rollout status deployment/go-lxd-vm-dashboard -n dev --timeout=90s
+          kubectl rollout status deployment/grafan-lxd-monitoring -n dev --timeout=90s
 
       - name: Cleanup kubeconfig
         if: always()
@@ -158,7 +158,7 @@ jobs:
         run: |
           export KUBECONFIG=/tmp/kubeconfig
 
-          helm upgrade --install go-lxd-vm-dashboard ./helm-chart \
+          helm upgrade --install grafan-lxd-monitoring ./helm-chart \
             --namespace staging \
             --create-namespace \
             --values helm-chart/values-staging.yaml \
@@ -168,7 +168,7 @@ jobs:
       - name: Verify rollout
         run: |
           export KUBECONFIG=/tmp/kubeconfig
-          kubectl rollout status deployment/go-lxd-vm-dashboard -n staging --timeout=90s
+          kubectl rollout status deployment/grafan-lxd-monitoring -n staging --timeout=90s
 
       - name: Cleanup kubeconfig
         if: always()

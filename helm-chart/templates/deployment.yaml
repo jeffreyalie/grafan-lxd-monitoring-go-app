@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
 spec:
   replicas: 1
   selector:
@@ -21,10 +23,20 @@ spec:
               containerPort: 8080
           env:
             - name: VAULT_SKIP_VERIFY
-              value: "true"  # This fixes the 'unknown authority' error
+              value: "true"
             - name: LXD_ADDR
               value: {{ .Values.lxd.address | quote }}
-          # Pulls VAULT_ADDR, VAULT_ROLE_ID, and VAULT_SECRET_ID from the secret
           envFrom:
             - secretRef:
                 name: {{ .Values.existingSecretName }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
