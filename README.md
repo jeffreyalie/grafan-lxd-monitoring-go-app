@@ -1,4 +1,8 @@
-# grafan-lxd-monitoring
+# Grafan lxd monitoring webui
+
+![Grafan LXD monitoring dashboard](images/grafana-lxd-monitoring.png)
+
+## grafan-lxd-monitoring
 
 A lightweight Go exporter that exposes the live state of LXD instances (VMs and containers) as Prometheus metrics, with a ServiceMonitor and a Grafana dashboard shipped in the Helm chart.
 
