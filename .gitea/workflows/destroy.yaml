@@ -1,0 +1,79 @@
+name: Destroy Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: 'Namespace to uninstall from'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - live
+      delete_namespace:
+        description: '⚠️ IMPORTANT: Also delete the namespace (removes openbao-creds too)'
+        type: boolean
+        default: false
+
+jobs:
+  uninstall:
+    runs-on: ubuntu-latest
+    # Optional: Require approval for destruction
+    environment: ${{ github.event.inputs.namespace }} 
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install helm and kubectl
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/kubectl
+
+      - name: Fetch Kubeconfig from OpenBao
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_ROLE_ID: ${{ secrets.VAULT_ROLE_ID }}
+          VAULT_SECRET_ID: ${{ secrets.VAULT_SECRET_ID }}
+        run: |
+          VAULT_TOKEN=$(curl -s -k -X POST "${VAULT_ADDR}/v1/auth/approle/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"role_id\":\"${VAULT_ROLE_ID}\",\"secret_id\":\"${VAULT_SECRET_ID}\"}" \
+            | jq -r '.auth.client_token')
+          
+          curl -s -k -H "X-Vault-Token: ${VAULT_TOKEN}" \
+            "${VAULT_ADDR}/v1/homelab/data/microk8s" \
+            | jq -r '.data.data.kubeconfig' > /tmp/kubeconfig
+
+      - name: Helm Uninstall
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+          echo "Uninstalling from namespace: ${{ github.event.inputs.namespace }}"
+          
+          # Use --wait to ensure resources are actually gone before finishing
+          helm uninstall go-lxd-vm-dashboard \
+            --namespace ${{ github.event.inputs.namespace }} \
+            --wait || echo "Release not found, skipping."
+
+      - name: Cleanup remaining ConfigMaps
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+          # Sometimes the dashboard configmap isn't part of the helm release 
+          # if it was created manually or via a different hook.
+          kubectl delete configmap go-lxd-vm-dashboard-grafana-dashboard \
+            --namespace ${{ github.event.inputs.namespace }} --ignore-not-found
+        
+      - name: Delete namespace (if requested)
+        if: ${{ github.event.inputs.delete_namespace == 'true' }}
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+          kubectl delete namespace ${{ github.event.inputs.namespace }} --ignore-not-found
+
+      - name: Cleanup kubeconfig
+        if: always()
+        run: rm -f /tmp/kubeconfig
+        

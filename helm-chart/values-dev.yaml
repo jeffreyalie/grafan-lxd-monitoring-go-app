@@ -1,0 +1,13 @@
+# helm-chart/values-dev.yaml
+# Overrides for the dev environment
+
+ingress:
+  enabled: true
+  className: "public"
+  host: "dev.local"
+
+existingSecretName: "openbao-creds"
+
+grafana:
+  dashboard:
+    enabled: true

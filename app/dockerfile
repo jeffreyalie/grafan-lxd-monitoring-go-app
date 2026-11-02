@@ -1,0 +1,15 @@
+# Build Stage
+FROM golang:1.26.2-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o go-lxd-vm-dashboard .
+
+# Final Stage
+FROM alpine:latest
+WORKDIR /root/
+COPY --from=builder /app/go-lxd-vm-dashboard .
+COPY --from=builder /app/index.html .
+EXPOSE 8080
+CMD ["./go-lxd-vm-dashboard"]

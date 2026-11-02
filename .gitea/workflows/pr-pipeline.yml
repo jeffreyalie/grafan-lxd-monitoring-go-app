@@ -1,0 +1,175 @@
+name: PR Pipeline (dev → staging)
+
+# ------------------------------------------------------------------
+# Switch to pull_request: trigger once you've validated this works:
+#
+# on:
+#   pull_request:
+#     branches: [ main ]
+# ------------------------------------------------------------------
+on:
+  workflow_dispatch:
+
+env:
+  # MicroK8s server IP (update in Gitea org secrets when changing)
+  IMAGE_REPO: 10.206.213.243:32000/go-lxd-vm-dashboard
+  IMAGE_TAG: pr-${{ github.run_number }}
+
+jobs:
+  # ----------------------------------------------------------------
+  # Job 1: Build & push the Docker image (no approval needed)
+  # ----------------------------------------------------------------
+  build-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }} \
+            ./app
+
+      - name: Push to local registry
+        run: |
+          docker push ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
+
+      - name: Summary
+        run: echo "Built and pushed ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}"
+
+  # ----------------------------------------------------------------
+  # Job 2: Deploy to dev  (requires 'dev' environment approval)
+  # ----------------------------------------------------------------
+  deploy-dev-pr:
+    needs: build-pr
+    runs-on: ubuntu-latest
+    environment: dev           # ← Gitea environment gate (add reviewers in repo settings)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install helm and kubectl
+        run: |
+          which curl || apt-get install -y curl
+          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --max-time 120  https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm version
+
+          curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/kubectl
+          kubectl version --client
+
+      - name: Fetch MicroK8s kubeconfig from OpenBao
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_ROLE_ID: ${{ secrets.VAULT_ROLE_ID }}
+          VAULT_SECRET_ID: ${{ secrets.VAULT_SECRET_ID }}
+        run: |
+          # Authenticate with AppRole
+          VAULT_TOKEN=$(curl -s -k -X POST "${VAULT_ADDR}/v1/auth/approle/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"role_id\":\"${VAULT_ROLE_ID}\",\"secret_id\":\"${VAULT_SECRET_ID}\"}" \
+            | jq -r '.auth.client_token')
+
+          if [ -z "$VAULT_TOKEN" ] || [ "$VAULT_TOKEN" = "null" ]; then
+            echo "ERROR: OpenBao login failed"
+            exit 1
+          fi
+
+          # Fetch kubeconfig
+          curl -s -k \
+            -H "X-Vault-Token: ${VAULT_TOKEN}" \
+            "${VAULT_ADDR}/v1/homelab/data/microk8s" \
+            | jq -r '.data.data.kubeconfig' > /tmp/kubeconfig
+
+          if [ ! -s /tmp/kubeconfig ]; then
+            echo "ERROR: kubeconfig fetch failed or empty"
+            exit 1
+          fi
+          echo "Kubeconfig fetched successfully"
+
+      - name: Deploy to dev namespace
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+
+          helm upgrade --install go-lxd-vm-dashboard ./helm-chart \
+            --namespace dev \
+            --create-namespace \
+            --values helm-chart/values-dev.yaml \
+            --set image.tag=${{ env.IMAGE_TAG }} \
+            --wait --timeout 2m
+
+      - name: Verify rollout
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+          kubectl rollout status deployment/go-lxd-vm-dashboard -n dev --timeout=90s
+
+      - name: Cleanup kubeconfig
+        if: always()
+        run: rm -f /tmp/kubeconfig
+
+  # ----------------------------------------------------------------
+  # Job 3: Deploy to staging  (requires 'staging' environment approval)
+  # ----------------------------------------------------------------
+  deploy-staging-pr:
+    needs: deploy-dev-pr
+    runs-on: ubuntu-latest
+    environment: staging       # ← Gitea environment gate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install helm and kubectl
+        run: |
+          which curl || apt-get install -y curl
+          curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm version
+
+          curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /usr/local/bin/kubectl
+          kubectl version --client
+
+      - name: Fetch MicroK8s kubeconfig from OpenBao
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_ROLE_ID: ${{ secrets.VAULT_ROLE_ID }}
+          VAULT_SECRET_ID: ${{ secrets.VAULT_SECRET_ID }}
+        run: |
+          VAULT_TOKEN=$(curl -s -k -X POST "${VAULT_ADDR}/v1/auth/approle/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"role_id\":\"${VAULT_ROLE_ID}\",\"secret_id\":\"${VAULT_SECRET_ID}\"}" \
+            | jq -r '.auth.client_token')
+
+          if [ -z "$VAULT_TOKEN" ] || [ "$VAULT_TOKEN" = "null" ]; then
+            echo "ERROR: OpenBao login failed"
+            exit 1
+          fi
+
+          curl -s -k \
+            -H "X-Vault-Token: ${VAULT_TOKEN}" \
+            "${VAULT_ADDR}/v1/homelab/data/microk8s" \
+            | jq -r '.data.data.kubeconfig' > /tmp/kubeconfig
+
+          [ -s /tmp/kubeconfig ] || { echo "ERROR: empty kubeconfig"; exit 1; }
+
+      - name: Deploy to staging namespace
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+
+          helm upgrade --install go-lxd-vm-dashboard ./helm-chart \
+            --namespace staging \
+            --create-namespace \
+            --values helm-chart/values-staging.yaml \
+            --set image.tag=${{ env.IMAGE_TAG }} \
+            --wait --timeout 2m
+
+      - name: Verify rollout
+        run: |
+          export KUBECONFIG=/tmp/kubeconfig
+          kubectl rollout status deployment/go-lxd-vm-dashboard -n staging --timeout=90s
+
+      - name: Cleanup kubeconfig
+        if: always()
+        run: rm -f /tmp/kubeconfig

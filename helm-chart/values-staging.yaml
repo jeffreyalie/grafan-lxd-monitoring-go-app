@@ -1,0 +1,9 @@
+# helm-chart/values-staging.yaml
+# Overrides for the staging environment
+
+ingress:
+  enabled: true
+  className: "public"
+  host: "staging.local"
+
+existingSecretName: "openbao-creds"

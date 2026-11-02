@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LXD Instance Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 40px;
+            background-color: #f4f7f9;
+            color: #333;
+        }
+        h1 {
+            color: #0044cc;
+            border-bottom: 3px solid #0044cc;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #0044cc;
+            color: white;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+        tr:hover {
+            background-color: #f9fbff;
+        }
+        /* Status Colors */
+        .status-Running {
+            color: #28a745;
+            font-weight: bold;
+            background: #e6f4ea;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .status-Stopped {
+            color: #dc3545;
+            font-weight: bold;
+            background: #fdeaea;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        /* Type Badge */
+        .type-badge {
+            background: #6c757d;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            text-transform: capitalize;
+        }
+        /* Optimized IP Address Badges */
+        td code {
+            display: inline-block;
+            background: #e9ecef;
+            color: #495057;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin: 2px 0;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            border: 1px solid #dee2e6;
+        }
+        .interface-name {
+            font-size: 0.7rem;
+            color: #888;
+            margin-left: 5px;
+        }
+        .error-box {
+            background: #ffdbdb;
+            color: #a10000;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 5px solid #dc3545;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>LXD Instance Status</h1>
+
+    {{if .Error}}
+        <div class="error-box">
+            <strong>System Error:</strong> {{.Error}}
+        </div>
+    {{end}}
+
+    <table>
+        <thead>
+            <tr>
+                <th>Instance Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>IPv4 Network Addresses</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Instances}}
+            <tr>
+                <td><strong>{{.Name}}</strong></td>
+                <td><span class="type-badge">{{.Type}}</span></td>
+                <td><span class="status-{{.Status}}">{{.Status}}</span></td>
+                <td>
+                    {{range $netName, $net := .State.Network}}
+                        {{range .Addresses}}
+                            {{if eq .Family "inet"}}
+                                <div>
+                                    <code>{{.Address}}</code>
+                                    <span class="interface-name">({{$netName}})</span>
+                                </div>
+                            {{end}}
+                        {{end}}
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+
+</body>
+</html>

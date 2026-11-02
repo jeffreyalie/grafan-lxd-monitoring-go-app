@@ -1,0 +1,33 @@
+{
+  "uid": "lxd-instances",
+  "title": "LXD Instances",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": { "list": [{
+    "name": "namespace", "type": "query", "label": "Environment",
+    "datasource": { "type": "prometheus", "uid": "prometheus" },
+    "query": "label_values(lxd_instance_up, namespace)", "refresh": 2
+  }]},
+  "panels": [
+    { "id": 1, "type": "stat", "title": "Running", "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "count(lxd_instance_up{namespace=\"$namespace\"} == 1) or vector(0)" }] },
+    { "id": 2, "type": "stat", "title": "Stopped", "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "count(lxd_instance_up{namespace=\"$namespace\"} == 0) or vector(0)" }] },
+    { "id": 3, "type": "stat", "title": "Seconds since last good poll", "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "time() - lxd_last_successful_poll_timestamp_seconds{namespace=\"$namespace\"}" }] },
+    { "id": 4, "type": "table", "title": "Instances", "gridPos": { "x": 0, "y": 4, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "lxd_instance_up{namespace=\"$namespace\"}", "format": "table", "instant": true }] },
+    { "id": 5, "type": "timeseries", "title": "Memory usage", "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [{ "expr": "lxd_instance_memory_usage_bytes{namespace=\"$namespace\"}", "legendFormat": "{{name}}" }] },
+    { "id": 6, "type": "timeseries", "title": "CPU (cores)", "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "rate(lxd_instance_cpu_usage_seconds_total{namespace=\"$namespace\"}[5m])", "legendFormat": "{{name}}" }] }
+  ]
+}
