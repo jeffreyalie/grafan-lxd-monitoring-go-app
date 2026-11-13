@@ -214,6 +214,7 @@ git checkout -b feature/my-change
 ```
 
 ### 2. Make changes and check locally
+If main.go is modified then use **Makefiel**
 
 The `Makefile` runs Go inside Docker instead of requiring a local toolchain:
 
