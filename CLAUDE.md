@@ -34,8 +34,8 @@ Prometheus and Grafana come from kube-prometheus-stack, which lives in a **separ
 
 **Build and push the image:**
 ```bash
-docker build -t 10.206.213.243:32000/grafan-lxd-monitoring:$TAG ./app
-docker push 10.206.213.243:32000/grafan-lxd-monitoring:$TAG
+docker build -t harbor.local/microk8s/grafan-lxd-monitoring:$TAG ./app
+docker push harbor.local/microk8s/grafan-lxd-monitoring:$TAG
 ```
 
 **Deploy to an environment** (run from repo root, chart is local, release name fixed):

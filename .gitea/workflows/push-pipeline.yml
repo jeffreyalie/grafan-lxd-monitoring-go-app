@@ -1,4 +1,4 @@
-name: Push Pipeline (live)
+name: (live)
 
 # ------------------------------------------------------------------
 # Switch to push: trigger once you've validated this works:
@@ -12,8 +12,8 @@ on:
 
 env:
   # MicroK8s server IP (update in Gitea org secrets when changing)
-  IMAGE_REPO: 10.206.213.243:32000/grafan-lxd-monitoring
-  IMAGE_TAG: pr-${{ github.run_number }}
+  IMAGE_REPO: harbor.local/microk8s/grafan-lxd-monitoring
+  IMAGE_TAG: pr-live${{ github.run_number }}
 
 jobs:
   # ----------------------------------------------------------------
@@ -24,6 +24,47 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Connect to Harbor via OpenBao credentials
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_ROLE_ID: ${{ secrets.VAULT_ROLE_ID }}
+          VAULT_SECRET_ID: ${{ secrets.VAULT_SECRET_ID }}
+        run: |
+          # Authenticate with AppRole
+          VAULT_TOKEN=$(curl -s -k -X POST "${VAULT_ADDR}/v1/auth/approle/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"role_id\":\"${VAULT_ROLE_ID}\",\"secret_id\":\"${VAULT_SECRET_ID}\"}" \
+            | jq -r '.auth.client_token')
+
+          if [ -z "$VAULT_TOKEN" ] || [ "$VAULT_TOKEN" = "null" ]; then
+            echo "ERROR: OpenBao login failed"
+            exit 1
+          fi
+
+              [ -n "$VAULT_TOKEN" ] && [ "$VAULT_TOKEN" != "null" ]
+
+          # Retrieve Harbor credentials
+          HARBOR_SECRET=$(curl -fsSk \
+            -H "X-Vault-Token: ${VAULT_TOKEN}" \
+            "${VAULT_ADDR}/v1/homelab/data/harbor")
+
+          HARBOR_USERNAME=$(echo "$HARBOR_SECRET" | jq -r '.data.data.username')
+          HARBOR_PASSWORD=$(echo "$HARBOR_SECRET" | jq -r '.data.data.password')
+
+          [ -n "$HARBOR_USERNAME" ] && [ "$HARBOR_USERNAME" != "null" ]
+          [ -n "$HARBOR_PASSWORD" ] && [ "$HARBOR_PASSWORD" != "null" ]
+
+          # Mask credentials in workflow logs
+          echo "::add-mask::$HARBOR_USERNAME"
+          echo "::add-mask::$HARBOR_PASSWORD"
+
+          # Authenticate Docker
+          printf '%s' "$HARBOR_PASSWORD" | docker login harbor.local \
+            --username "$HARBOR_USERNAME" \
+            --password-stdin
+
+          echo "Successfully authenticated with Harbor"
 
       - name: Build Docker image
         run: |
@@ -49,16 +90,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
      
-      - name: Install helm and kubectl
-        run: |
-          which curl || apt-get install -y curl
-          curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --max-time 120  https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          helm version
-
-          curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          mv kubectl /usr/local/bin/kubectl
-          kubectl version --client
+      - name: Install helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.16.4'
+      
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
 
       - name: Fetch MicroK8s kubeconfig from OpenBao
         env:

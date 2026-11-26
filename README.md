@@ -269,7 +269,7 @@ Then check that the target is **UP** in Prometheus (`Status -> Targets`, look fo
 
 ```
 build-pr          -> builds image tagged pr-<run_number>
-                     pushes to 10.206.213.243:32000/grafan-lxd-monitoring
+                     pushes to harbor.local/microk8s/grafan-lxd-monitoring
 
 deploy-dev-pr     -> needs: build-pr
                      fetches kubeconfig from OpenBao
@@ -337,8 +337,8 @@ Each deploy job targets a Gitea **environment** (`dev`, `staging`, `live`) so ap
 Multi-stage build: the Go binary is compiled in `golang:1.26.2-alpine` and copied into `alpine:latest`, running as a non-root user. Only the binary is included. No credentials are baked in.
 
 ```bash
-docker build -t 10.206.213.243:32000/grafan-lxd-monitoring:latest ./app
-docker push 10.206.213.243:32000/grafan-lxd-monitoring:latest
+docker build -t harbor.local/microk8s/grafan-lxd-monitoring:latest ./app
+docker push harbor.local/microk8s/grafan-lxd-monitoring:latest
 ```
 
 ---
