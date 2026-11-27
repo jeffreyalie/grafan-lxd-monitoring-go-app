@@ -12,10 +12,9 @@ on:
           - dev
           - staging
           - live
-      delete_namespace:
-        description: '⚠️ IMPORTANT: Also delete the namespace (removes openbao-creds too)'
-        type: boolean
-        default: false
+
+  env::
+    RELEASENAME: grafan-lxd-monitoring-goapp
 
 jobs:
   uninstall:
@@ -56,7 +55,7 @@ jobs:
           echo "Uninstalling from namespace: ${{ github.event.inputs.namespace }}"
           
           # Use --wait to ensure resources are actually gone before finishing
-          helm uninstall grafan-lxd-monitoring \
+          helm uninstall ${{ env.RELEASENAME }} \
             --namespace ${{ github.event.inputs.namespace }} \
             --wait || echo "Release not found, skipping."
 
@@ -65,16 +64,5 @@ jobs:
           export KUBECONFIG=/tmp/kubeconfig
           # Sometimes the dashboard configmap isn't part of the helm release 
           # if it was created manually or via a different hook.
-          kubectl delete configmap grafan-lxd-monitoring-grafana-dashboard \
+          kubectl delete configmap ${{ env.RELEASENAME }}-grafana-dashboard \
             --namespace ${{ github.event.inputs.namespace }} --ignore-not-found
-        
-      - name: Delete namespace (if requested)
-        if: ${{ github.event.inputs.delete_namespace == 'true' }}
-        run: |
-          export KUBECONFIG=/tmp/kubeconfig
-          kubectl delete namespace ${{ github.event.inputs.namespace }} --ignore-not-found
-
-      - name: Cleanup kubeconfig
-        if: always()
-        run: rm -f /tmp/kubeconfig
-        

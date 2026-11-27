@@ -1,8 +1,0 @@
-# helm-chart/values-dev.yaml
-# Overrides for the dev environment
-
-existingSecretName: "openbao-creds"
-
-grafana:
-  dashboard:
-    enabled: true

@@ -174,8 +174,8 @@ kube-prometheus-stack must already be running and configured so that:
 
 ### One-time infrastructure setup
 
-**MicroK8s**: create namespaces and inject OpenBao credentials as K8s secrets:
-
+**MicroK8s level secrests** — create namespaces and inject OpenBao credentials as K8s secrets.
+used by Goapp via opensec() for lxd certs
 ```bash
 microk8s kubectl create namespace dev
 microk8s kubectl create namespace staging
@@ -190,17 +190,21 @@ for NS in dev staging live; do
     --dry-run=client -o yaml | microk8s kubectl apply -f -
 done
 ```
-
-**OpenBao**: the LXD client cert and key must exist at `homelab/data/lxd` with keys `client_cert` and `client_key`, and the `gitea-runner` policy must allow `read` on it (plus `homelab/data/microk8s` for the pipelines).
-
-**Gitea org secrets**: add at org level so all repos can use them:
-
+**MicroK8s level secrests***
+Used by container to pull image from harbor. settings via deployment.yaml
+```bash
+      imagePullSecrets:
+        - name: harbor-pull   
 ```
-Settings -> Secrets -> VAULT_ADDR
-                    -> VAULT_ROLE_ID
-                    -> VAULT_SECRET_ID
+```bash
+for NS in dev staging live; do
+  microk8s kubectl create secret docker-registry harbor-pull \
+    --docker-server=harbor.local \
+    --docker-username='robot$microk8s+microk8s' \
+    --docker-password='EdWc3ihTH1uKvaJ5TNmQsX6pJaOrZAvZ' \
+    -n $NS --dry-run=client -o yaml | microk8s kubectl apply -f -
+done
 ```
-
 ---
 
 ## Quick Steps to Deploy

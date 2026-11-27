@@ -1,8 +1,0 @@
-# helm-chart/values-live.yaml
-# Overrides for the live environment
-
-existingSecretName: "openbao-creds"
-
-grafana:
-  dashboard:
-    enabled: true

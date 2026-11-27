@@ -1,10 +1,10 @@
-name: (live)
+name: grafana-lxd-monitoring-go-app
 
 # ------------------------------------------------------------------
-# Switch to push: trigger once you've validated this works:
+# Switch to pull_request: trigger once you've validated this works:
 #
 # on:
-#   push:
+#   pull_request:
 #     branches: [ main ]
 # ------------------------------------------------------------------
 on:
@@ -13,19 +13,24 @@ on:
 env:
   # MicroK8s server IP (update in Gitea org secrets when changing)
   IMAGE_REPO: harbor.local/microk8s/grafan-lxd-monitoring
-  IMAGE_TAG: pr-live${{ github.run_number }}
+  IMAGE_TAG: pr-${{ github.run_number }}
+  RELEASENAME: grafan-lxd-monitoring-goapp
+  HELM_CHART_DIR: ./helm-chart
+  NAMESPACE: grafana-monitoring
+  
+
 
 jobs:
   # ----------------------------------------------------------------
   # Job 1: Build & push the Docker image (no approval needed)
   # ----------------------------------------------------------------
-  build:
+  build-pr:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Connect to Harbor via OpenBao credentials
+      - name: Connect to Harbor via OpenBao credentials for docekr push
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
           VAULT_ROLE_ID: ${{ secrets.VAULT_ROLE_ID }}
@@ -77,19 +82,19 @@ jobs:
           docker push ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}
 
       - name: Summary
-        run: echo "Built and pushed ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }}"
+        run: echo "Built and pushed ${{ env.IMAGE_REPO }}:${{ env.IMAGE_TAG }} successfully"
 
   # ----------------------------------------------------------------
-  # Job 2: Deploy to live  (requires 'live' environment approval)
+  # Job 2: Deploy to grafan-lxd-monitoring-goapp  
   # ----------------------------------------------------------------
-  deploy-live:
-    needs: build
+  deploy-grafana-lxd-monitoring-goapp:
+    needs: build-pr
     runs-on: ubuntu-latest
-    environment: live          # ← Gitea environment gate (add reviewers in repo settings)
+    # environment: dev           # ← Gitea environment gate (add reviewers in repo settings)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-     
+      
       - name: Install helm
         uses: azure/setup-helm@v4
         with:
@@ -127,22 +132,27 @@ jobs:
           fi
           echo "Kubeconfig fetched successfully"
 
-      - name: Deploy to live namespace
+      - name: Deploy ${{ env.RELEASENAME }} to namespace ${{ env.NAMESPACE }}
         run: |
           export KUBECONFIG=/tmp/kubeconfig
 
-          helm upgrade --install grafan-lxd-monitoring ./helm-chart \
-            --namespace live \
+          helm upgrade --install ${{ env.RELEASENAME }} ${{ env.HELM_CHART_DIR }} \
+            --namespace ${{ env.NAMESPACE }} \
             --create-namespace \
-            --values helm-chart/values-live.yaml \
+            --set image.repository=${{ env.IMAGE_REPO }} \
             --set image.tag=${{ env.IMAGE_TAG }} \
             --wait --timeout 2m
 
       - name: Verify rollout
         run: |
           export KUBECONFIG=/tmp/kubeconfig
-          kubectl rollout status deployment/grafan-lxd-monitoring -n live --timeout=90s
+          kubectl rollout restart deployment/${{ env.RELEASENAME }} -n ${{ env.NAMESPACE }}
+          kubectl rollout status deployment/${{ env.RELEASENAME }} -n ${{ env.NAMESPACE }} --timeout=90s
+          echo "Deployment verified successfully"
 
       - name: Cleanup kubeconfig
         if: always()
-        run: rm -f /tmp/kubeconfig
+        run: |
+          rm -f /tmp/kubeconfig
+          echo "Kubeconfig cleaned up successfully"
+

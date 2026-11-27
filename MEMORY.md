@@ -1,0 +1,3 @@
+# Memory
+
+- [Grafan LXD Monitoring Project Overview](./memory/grafan-lxd-monitoring-project-overview.md) — This repository implements a Go exporter that exposes LXD instance metrics as Prometheus metrics, deployed on MicroK8s via Helm across dev, staging, and live environments. It authenticates to OpenBao via AppRole, reads LXD TLS certificates from OpenBao, polls the LXD API in background, caches results in memory, and serves them via `/metrics` endpoint.
