@@ -12,7 +12,7 @@ on:
 
 env:
   # MicroK8s server IP (update in Gitea org secrets when changing)
-  IMAGE_REPO: harbor.local/microk8s/grafan-lxd-monitoring
+  IMAGE_REPO: harbor.local/microk8s/grafan-lxd-monitoring-goapp
   IMAGE_TAG: pr-${{ github.run_number }}
   RELEASENAME: grafan-lxd-monitoring-goapp
   HELM_CHART_DIR: ./helm-chart
