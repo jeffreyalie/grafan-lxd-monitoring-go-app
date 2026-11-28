@@ -22,9 +22,27 @@ env:
 
 jobs:
   # ----------------------------------------------------------------
+  # Job 0.0: Linting
+  # ----------------------------------------------------------------
+  yaml-linting:
+    uses: admin/reusable-linting/.gitea/workflows/lint.yaml@main
+    with:
+      helm_dir: "./helm-chart"
+  # ----------------------------------------------------------------
+  # Job 0: Linting
+  # ----------------------------------------------------------------
+  go-linting:
+    needs: yaml-linting
+    uses: admin/reusable-linting/.gitea/workflows/go_lint.yaml@main
+    with:
+      app_dir: "app"
+      go_ver: "1.26.2"  # check go.mod first
+
+  # ----------------------------------------------------------------
   # Job 1: Build & push the Docker image (no approval needed)
   # ----------------------------------------------------------------
   build-pr:
+    needs: go-linting
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
