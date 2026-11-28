@@ -177,11 +177,9 @@ kube-prometheus-stack must already be running and configured so that:
 **MicroK8s level secrests** — create namespaces and inject OpenBao credentials as K8s secrets.
 used by Goapp via opensec() for lxd certs
 ```bash
-microk8s kubectl create namespace dev
-microk8s kubectl create namespace staging
-microk8s kubectl create namespace live
+microk8s kubectl create namespace grafana-monitoring
 
-for NS in dev staging live; do
+for NS in grafana-monitoring; do
   microk8s kubectl create secret generic openbao-creds \
     --from-literal=VAULT_ADDR=https://<openbao-ip>:8200 \
     --from-literal=VAULT_ROLE_ID=<role-id> \
@@ -197,11 +195,11 @@ Used by container to pull image from harbor. settings via deployment.yaml
         - name: harbor-pull   
 ```
 ```bash
-for NS in dev staging live; do
+for NS in grafana-monitoring; do
   microk8s kubectl create secret docker-registry harbor-pull \
     --docker-server=harbor.local \
     --docker-username='robot$microk8s+microk8s' \
-    --docker-password='EdWc3ihTH1uKvaJ5TNmQsX6pJaOrZAvZ' \
+    --docker-password='xxxxxxxxxxxxxxxx' \
     -n $NS --dry-run=client -o yaml | microk8s kubectl apply -f -
 done
 ```
